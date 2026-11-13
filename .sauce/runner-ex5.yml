@@ -17,12 +17,22 @@ espresso:
 
 suites:
   - name: "Example 5: Parallel with Dynamic allocation - succesfulLoginTest"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       class: 
         - com.saucelabs.mydemoapp.android.view.activities.LoginTest#succesfulLoginTest
     devices:
       - name: "Samsung Galaxy Note.*"
   - name: "Tests from Example 5: Parallel with Dynamic allocation - noUsernameLoginTest"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       class:
         - com.saucelabs.mydemoapp.android.view.activities.LoginTest#noUsernameLoginTest

@@ -15,6 +15,11 @@ espresso:
 
 suites:
   - name: "Example 3: One test per device - successfulLogin"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       class: 
         - com.saucelabs.mydemoapp.android.view.activities.LoginTest#succesfulLoginTest
@@ -24,6 +29,11 @@ suites:
           # Possible values [ANY,PHONE,TABLET]
           deviceType: PHONE
   - name: "Example 3: One test per device - noUsernameLogin"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       class:
         - com.saucelabs.mydemoapp.android.view.activities.LoginTest#noUsernameLoginTest

@@ -15,6 +15,11 @@ espresso:
 
 suites:
   - name: "Example 9 - Shard All tests"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       # use 4 instances to divide the tests over
       numShards: 4

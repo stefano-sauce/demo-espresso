@@ -15,6 +15,11 @@ espresso:
 
 suites:
   - name: "Example 2: Min config for two tests - succesfulLoginTest and noUsernameLoginTest"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       class: 
         - com.saucelabs.mydemoapp.android.view.activities.LoginTest#succesfulLoginTest

@@ -17,6 +17,11 @@ espresso:
 
 suites:
   - name: "Example 6: Parallel execution by platform version - succesfulLoginTest"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       class: 
         - com.saucelabs.mydemoapp.android.view.activities.LoginTest#succesfulLoginTest
@@ -24,6 +29,11 @@ suites:
       - name: "Samsung.*"
         platformVersion: 10
   - name: "Example 6: Parallel execution by platform version - noUsernameLoginTest"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       class:
         - com.saucelabs.mydemoapp.android.view.activities.LoginTest#noUsernameLoginTest

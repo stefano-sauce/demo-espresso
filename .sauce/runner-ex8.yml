@@ -15,6 +15,11 @@ espresso:
 
 suites:
   - name: "Example 8 - succesfulLoginTest on an Emulator and Real Device"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       class: 
         - com.saucelabs.mydemoapp.android.view.activities.LoginTest#succesfulLoginTest

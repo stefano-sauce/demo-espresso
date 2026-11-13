@@ -25,7 +25,8 @@ LOG_FILE="${LOG_FILE:-$HOME/sauce_automation_espresso.log}"
 # Max wall-clock per example; hard-coded devices (ex4) can otherwise queue indefinitely.
 EXAMPLE_TIMEOUT="${EXAMPLE_TIMEOUT:-30m}"
 BUILD_DATE="$(date +%Y-%m-%d)"
-BASE_TAGS="framework:espresso,cli:saucectl,lang:java,usecase:native-app-android,repo:demo-espresso"
+# Real-device suites enable networkCapture + vitals via appSettings in each runner-ex*.yml.
+BASE_TAGS="framework:espresso,cli:saucectl,lang:java,usecase:native-app-android,repo:demo-espresso,feature:network-capture,feature:device-vitals"
 
 # Keep the Mac awake for the whole run.
 caffeinate -i -w $$ &
@@ -47,8 +48,20 @@ fi
 cd "$PROJECT_DIR" || { echo "ERROR: Directory $PROJECT_DIR does not exist." >> "$LOG_FILE"; exit 1; }
 echo "Changed directory to $PROJECT_DIR" >> "$LOG_FILE"
 
+# Under cron/launchd, macOS privacy controls stop bash from listing ~/Documents, so a
+# `.sauce/runner-ex*.yml` glob stays literal. List the configs with node (which has access),
+# falling back to the glob when node is unavailable.
+NODE="$(command -v node || echo /opt/homebrew/bin/node)"
+CONFIGS="$("$NODE" -e '
+    const fs = require("fs");
+    fs.readdirSync(".sauce").filter(f => /^runner-ex\d+\.yml$/.test(f))
+      .sort((a, b) => parseInt(a.slice(9)) - parseInt(b.slice(9)))
+      .forEach(f => console.log(".sauce/" + f));' 2>/dev/null)"
+[ -z "$CONFIGS" ] && CONFIGS="$(printf '%s\n' .sauce/runner-ex*.yml)"
+echo "Configs: $(echo $CONFIGS)" >> "$LOG_FILE"
+
 FAILED=0
-for config in .sauce/runner-ex*.yml; do
+for config in $CONFIGS; do
     ex="$(basename "$config" .yml)"   # runner-ex1
     ex="${ex#runner-}"                # ex1
     tags="$BASE_TAGS,example:$ex"

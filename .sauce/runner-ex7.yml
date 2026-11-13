@@ -17,6 +17,11 @@ espresso:
 
 suites:
   - name: "Example 7: By test annotation - @ErrorFlow Annotation"
+    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    appSettings:
+      instrumentation:
+        networkCapture: true
+        vitals: true
     testOptions:
       annotation: com.saucelabs.mydemoapp.android.ErrorFlow
     devices:
