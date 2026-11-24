@@ -31,12 +31,12 @@ suites:
       - name: "Samsung.*"
         platformVersion: 10
   - name: "Example 6: Parallel execution by platform version - noUsernameLoginTest"
-    # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
+    # Real devices only: capture device vitals (CPU, memory, etc.). No network capture here:
+    # Sauce Labs supports it on Android 10+ only and this suite pins Android 9.
     appSettings:
-      # Instrumentation (network capture, vitals) only works on a re-signed app
+      # Instrumentation (vitals) only works on a re-signed app
       resigningEnabled: true
       instrumentation:
-        networkCapture: true
         vitals: true
     testOptions:
       class:

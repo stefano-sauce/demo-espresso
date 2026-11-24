@@ -27,28 +27,45 @@ EXAMPLE_TIMEOUT="${EXAMPLE_TIMEOUT:-30m}"
 BUILD_DATE="$(date +%Y-%m-%d)"
 BASE_TAGS="framework:espresso,cli:saucectl,lang:java,usecase:native-app-android,repo:demo-espresso"
 # Real-device suites enable networkCapture + vitals (plus the resigning they need) via appSettings
-# in each runner-ex*.yml. Emulators support neither, but saucectl tags a whole run at once, so
-# emulator jobs are re-tagged without these after each run (see untag_emulator_jobs).
+# in each runner-ex*.yml. saucectl tags a whole run at once, so after each run every job is
+# re-tagged with only the features it can actually have (see retag_jobs):
+#   - emulators: none (Sauce Labs supports neither feature on emulators)
+#   - real devices: vitals; network capture only on Android 10+ (Sauce Labs limitation)
 FEATURE_TAGS="feature:network-capture,feature:device-vitals"
 REPORT_DIR="$PROJECT_DIR/reports"   # gitignored
+API="https://api.$SAUCE_REGION.saucelabs.com"
 
-# Replaces the tags of every emulator job in saucectl's JSON report $1 with $2 (no feature tags).
-# Emulator jobs are the ones whose build lives under /builds/vdc/ (real devices: /builds/rdc/).
-untag_emulator_jobs() {
-    local report="$1" tags="$2" ids id
-    ids="$("$NODE" -e '
+sauce_put_tags() {   # $1 = API path, $2 = comma-separated tags
+    local json="[\"${2//,/\",\"}\"]"
+    curl -sf -o /dev/null -u "$SAUCE_USERNAME:$SAUCE_ACCESS_KEY" -X PUT \
+        -H "Content-Type: application/json" -d "{\"tags\":$json}" "$API/$1"
+}
+
+# Re-tags every job in saucectl's JSON report $1; $2 = tags without any feature:* tag.
+# Emulator jobs have their build under /builds/vdc/, real-device jobs under /builds/rdc/.
+retag_jobs() {
+    local report="$1" tags="$2" kind id os major new api_path
+    "$NODE" -e '
         const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-        for (const s of r) if ((s.buildURL || "").includes("/builds/vdc/"))
-            for (const a of s.attempts || []) console.log(a.id);' "$report" 2>> "$LOG_FILE")"
-    local json="[\"${tags//,/\",\"}\"]"
-    for id in $ids; do
-        if curl -sf -o /dev/null -u "$SAUCE_USERNAME:$SAUCE_ACCESS_KEY" -X PUT \
-                -H "Content-Type: application/json" -d "{\"tags\":$json}" \
-                "https://api.$SAUCE_REGION.saucelabs.com/rest/v1/$SAUCE_USERNAME/jobs/$id"; then
-            echo "Emulator job $id: tags set to $tags" >> "$LOG_FILE"
+        for (const s of r) for (const a of s.attempts || [])
+            console.log(((s.buildURL || "").includes("/builds/rdc/") ? "rdc" : "vdc") + " " + a.id);' \
+        "$report" 2>> "$LOG_FILE" | while read -r kind id; do
+        if [ "$kind" = vdc ]; then
+            new="$tags"; api_path="rest/v1/$SAUCE_USERNAME/jobs/$id"
         else
-            echo "WARNING: could not re-tag emulator job $id" >> "$LOG_FILE"
+            os="$(curl -s -u "$SAUCE_USERNAME:$SAUCE_ACCESS_KEY" "$API/v1/rdc/jobs/$id" \
+                | "$NODE" -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{console.log(JSON.parse(d).os_version||"")}catch{}})')"
+            major="${os%%.*}"
+            new="$tags,feature:device-vitals"
+            [ "${major:-0}" -ge 10 ] 2>/dev/null && new="$new,feature:network-capture"
+            api_path="v1/rdc/jobs/$id"
         fi
+        if sauce_put_tags "$api_path" "$new"; then
+            echo "Job $id ($kind${os:+, Android $os}): tags set to $new" >> "$LOG_FILE"
+        else
+            echo "WARNING: could not re-tag $kind job $id" >> "$LOG_FILE"
+        fi
+        os=""
     done
 }
 
@@ -105,7 +122,7 @@ for config in $CONFIGS; do
         echo "FAILURE: $ex" >> "$LOG_FILE"
         FAILED=$((FAILED + 1))
     fi
-    [ -f "$report" ] && untag_emulator_jobs "$report" "$tags"
+    [ -f "$report" ] && retag_jobs "$report" "$tags"
 done
 
 echo "All Espresso tests completed ($FAILED example(s) failed): $(date)" >> "$LOG_FILE"
