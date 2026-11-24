@@ -19,6 +19,8 @@ suites:
   - name: "Example 6: Parallel execution by platform version - succesfulLoginTest"
     # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
     appSettings:
+      # Instrumentation (network capture, vitals) only works on a re-signed app
+      resigningEnabled: true
       instrumentation:
         networkCapture: true
         vitals: true
@@ -31,6 +33,8 @@ suites:
   - name: "Example 6: Parallel execution by platform version - noUsernameLoginTest"
     # Real devices only: capture network traffic and device vitals (CPU, memory, etc.)
     appSettings:
+      # Instrumentation (network capture, vitals) only works on a re-signed app
+      resigningEnabled: true
       instrumentation:
         networkCapture: true
         vitals: true
