@@ -25,8 +25,32 @@ LOG_FILE="${LOG_FILE:-$HOME/sauce_automation_espresso.log}"
 # Max wall-clock per example; hard-coded devices (ex4) can otherwise queue indefinitely.
 EXAMPLE_TIMEOUT="${EXAMPLE_TIMEOUT:-30m}"
 BUILD_DATE="$(date +%Y-%m-%d)"
-# Real-device suites enable networkCapture + vitals via appSettings in each runner-ex*.yml.
-BASE_TAGS="framework:espresso,cli:saucectl,lang:java,usecase:native-app-android,repo:demo-espresso,feature:network-capture,feature:device-vitals"
+BASE_TAGS="framework:espresso,cli:saucectl,lang:java,usecase:native-app-android,repo:demo-espresso"
+# Real-device suites enable networkCapture + vitals (plus the resigning they need) via appSettings
+# in each runner-ex*.yml. Emulators support neither, but saucectl tags a whole run at once, so
+# emulator jobs are re-tagged without these after each run (see untag_emulator_jobs).
+FEATURE_TAGS="feature:network-capture,feature:device-vitals"
+REPORT_DIR="$PROJECT_DIR/reports"   # gitignored
+
+# Replaces the tags of every emulator job in saucectl's JSON report $1 with $2 (no feature tags).
+# Emulator jobs are the ones whose build lives under /builds/vdc/ (real devices: /builds/rdc/).
+untag_emulator_jobs() {
+    local report="$1" tags="$2" ids id
+    ids="$("$NODE" -e '
+        const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+        for (const s of r) if ((s.buildURL || "").includes("/builds/vdc/"))
+            for (const a of s.attempts || []) console.log(a.id);' "$report" 2>> "$LOG_FILE")"
+    local json="[\"${tags//,/\",\"}\"]"
+    for id in $ids; do
+        if curl -sf -o /dev/null -u "$SAUCE_USERNAME:$SAUCE_ACCESS_KEY" -X PUT \
+                -H "Content-Type: application/json" -d "{\"tags\":$json}" \
+                "https://api.$SAUCE_REGION.saucelabs.com/rest/v1/$SAUCE_USERNAME/jobs/$id"; then
+            echo "Emulator job $id: tags set to $tags" >> "$LOG_FILE"
+        else
+            echo "WARNING: could not re-tag emulator job $id" >> "$LOG_FILE"
+        fi
+    done
+}
 
 # Keep the Mac awake for the whole run.
 caffeinate -i -w $$ &
@@ -66,17 +90,22 @@ for config in $CONFIGS; do
     ex="${ex#runner-}"                # ex1
     tags="$BASE_TAGS,example:$ex"
     build="demo-espresso $ex $BUILD_DATE"
-    echo "Running (tags=$tags, build=$build): saucectl run --config $config" >> "$LOG_FILE"
+    report="$REPORT_DIR/saucectl-report-$ex.json"
+    mkdir -p "$REPORT_DIR"; rm -f "$report"
+    echo "Running (tags=$tags,$FEATURE_TAGS, build=$build): saucectl run --config $config" >> "$LOG_FILE"
     if saucectl run --config "$config" \
             --region "$SAUCE_REGION" \
-            --tags "$tags" \
+            --tags "$tags,$FEATURE_TAGS" \
             --build "$build" \
+            --reporters.json.enabled \
+            --reporters.json.filename "$report" \
             --timeout "$EXAMPLE_TIMEOUT" >> "$LOG_FILE" 2>&1; then
         echo "SUCCESS: $ex" >> "$LOG_FILE"
     else
         echo "FAILURE: $ex" >> "$LOG_FILE"
         FAILED=$((FAILED + 1))
     fi
+    [ -f "$report" ] && untag_emulator_jobs "$report" "$tags"
 done
 
 echo "All Espresso tests completed ($FAILED example(s) failed): $(date)" >> "$LOG_FILE"
